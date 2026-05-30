@@ -1,0 +1,11 @@
+dns
+kerberos
+ldap
+tcp.port == 445
+icmp
+
+
+OR
+
+
+ip.addr == IP_DC
