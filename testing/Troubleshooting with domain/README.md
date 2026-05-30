@@ -96,7 +96,7 @@ realm list
 ---
 ## Проверка пользователя
 ``` bash
-id DOMAIN\\user
+id DOMAIN\\\user
 ```
 ---
 ## Проверка GPO
