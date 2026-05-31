@@ -1,0 +1,90 @@
+---
+- name: Bootstrap SSH access on ALT Linux clients
+  hosts: alt_clients
+  gather_facts: true
+  become: true
+
+  vars:
+    local_admin_user: "{{ ansible_user }}"
+    public_key_file: "files/ansible_alt_ed25519.pub"
+
+  tasks:
+    - name: Show target host
+      ansible.builtin.debug:
+        msg: "Configuring {{ inventory_hostname }} as {{ local_admin_user }}"
+
+    - name: Ensure .ssh directory exists for local admin user
+      ansible.builtin.file:
+        path: "/home/{{ local_admin_user }}/.ssh"
+        state: directory
+        owner: "{{ local_admin_user }}"
+        group: "{{ local_admin_user }}"
+        mode: "0700"
+
+    - name: Install SSH public key for local admin user
+      ansible.builtin.authorized_key:
+        user: "{{ local_admin_user }}"
+        key: "{{ lookup('file', public_key_file) }}"
+        state: present
+        manage_dir: true
+
+    - name: Detect sshd config path
+      ansible.builtin.stat:
+        path: /etc/openssh/sshd_config
+      register: openssh_sshd_config
+
+    - name: Detect alternative sshd config path
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+      register: etc_ssh_sshd_config
+
+    - name: Set sshd config facts
+      ansible.builtin.set_fact:
+        sshd_config_path: >-
+          {{
+            '/etc/openssh/sshd_config'
+            if openssh_sshd_config.stat.exists
+            else '/etc/ssh/sshd_config'
+          }}
+        sshd_dropin_dir: >-
+          {{
+            '/etc/openssh/sshd_config.d'
+            if openssh_sshd_config.stat.exists
+            else '/etc/ssh/sshd_config.d'
+          }}
+
+    - name: Ensure sshd drop-in directory exists
+      ansible.builtin.file:
+        path: "{{ sshd_dropin_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Ensure Include directive exists in main sshd_config
+      ansible.builtin.lineinfile:
+        path: "{{ sshd_config_path }}"
+        regexp: '^Include\s+.*sshd_config\.d.*'
+        line: "Include {{ sshd_dropin_dir }}/*.conf"
+        insertafter: BOF
+        backup: true
+
+    - name: Install SSH drop-in config
+      ansible.builtin.template:
+        src: templates/90-ansible-hardening.conf.j2
+        dest: "{{ sshd_dropin_dir }}/90-ansible-hardening.conf"
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+
+    - name: Validate sshd configuration
+      ansible.builtin.command: sshd -t
+      register: sshd_test
+      changed_when: false
+
+    - name: Restart sshd service
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+      when: sshd_test.rc == 0

@@ -1,0 +1,24 @@
+---
+- name: Check SSH and su access
+  hosts: alt_clients
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Check current user
+      ansible.builtin.command: whoami
+      register: whoami_user
+      changed_when: false
+      become: false
+
+    - name: Check root escalation
+      ansible.builtin.command: whoami
+      register: whoami_root
+      changed_when: false
+
+    - name: Print result
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          ssh_user: "{{ whoami_user.stdout }}"
+          become_user: "{{ whoami_root.stdout }}"
