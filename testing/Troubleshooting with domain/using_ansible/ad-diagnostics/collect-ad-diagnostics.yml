@@ -1,0 +1,59 @@
+---
+- name: Collect AD / SSSD / Kerberos / GPO diagnostics from ALT Linux clients
+  hosts: alt_clients
+  gather_facts: true
+  become: true
+
+  vars:
+    remote_script: /tmp/ad-client-diagnostic.sh
+    remote_result_glob: /tmp/ad-client-diagnostic-*.tar.gz
+    local_collect_dir: ./collected
+
+  tasks:
+    - name: Ensure local collection directory exists
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: "{{ local_collect_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy diagnostic script
+      ansible.builtin.copy:
+        src: files/ad-client-diagnostic.sh
+        dest: "{{ remote_script }}"
+        mode: "0755"
+
+    - name: Run diagnostic script
+      ansible.builtin.shell: >
+        {{ remote_script }}
+        {{ ad_domain | quote }}
+        {{ test_user | default('') | quote }}
+      args:
+        executable: /bin/bash
+      register: diag_run
+      changed_when: true
+      failed_when: false
+
+    - name: Show diagnostic run output
+      ansible.builtin.debug:
+        var: diag_run.stdout_lines
+
+    - name: Find generated archives
+      ansible.builtin.find:
+        paths: /tmp
+        patterns: "ad-client-diagnostic-*.tar.gz"
+        file_type: file
+      register: found_archives
+
+    - name: Fetch diagnostic archives
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "{{ local_collect_dir }}/"
+        flat: false
+      loop: "{{ found_archives.files }}"
+
+    - name: Remove remote diagnostic script
+      ansible.builtin.file:
+        path: "{{ remote_script }}"
+        state: absent

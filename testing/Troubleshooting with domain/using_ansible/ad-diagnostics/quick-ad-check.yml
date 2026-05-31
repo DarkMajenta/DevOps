@@ -1,0 +1,55 @@
+---
+- name: Quick AD / SSSD check
+  hosts: alt_clients
+  gather_facts: false
+  become: true
+
+  vars:
+    ad_domain: domain.controller.address
+    test_user: ""
+
+  tasks:
+    - name: Check DNS SRV LDAP records
+      ansible.builtin.shell: "host -t SRV _ldap._tcp.dc._msdcs.{{ ad_domain }} || true"
+      register: dns_ldap
+      changed_when: false
+
+    - name: Check DNS SRV Kerberos records
+      ansible.builtin.shell: "host -t SRV _kerberos._tcp.dc._msdcs.{{ ad_domain }} || true"
+      register: dns_krb
+      changed_when: false
+
+    - name: Check SSSD domain status
+      ansible.builtin.shell: "sssctl domain-status 2>&1 || true"
+      register: sssd_status
+      changed_when: false
+
+    - name: Check keytab
+      ansible.builtin.shell: "klist -kte /etc/krb5.keytab 2>&1 || true"
+      register: keytab
+      changed_when: false
+
+    - name: Check recent SSSD errors
+      ansible.builtin.shell: >
+        journalctl -u sssd -b --no-pager 2>/dev/null |
+        grep -Ei 'error|fail|offline|ldap|krb|kdc|keytab|timeout|unreachable|gpo' |
+        tail -50 || true
+      register: sssd_errors
+      changed_when: false
+
+    - name: Optional user lookup
+      ansible.builtin.shell: "time getent passwd {{ test_user | quote }} 2>&1 || true"
+      register: user_lookup
+      changed_when: false
+      when: test_user | length > 0
+
+    - name: Print summary
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          dns_ldap: "{{ dns_ldap.stdout_lines }}"
+          dns_kerberos: "{{ dns_krb.stdout_lines }}"
+          sssd_status: "{{ sssd_status.stdout_lines }}"
+          keytab: "{{ keytab.stdout_lines }}"
+          sssd_errors: "{{ sssd_errors.stdout_lines }}"
+          user_lookup: "{{ user_lookup.stdout_lines | default([]) }}"
