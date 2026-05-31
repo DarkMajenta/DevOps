@@ -15,7 +15,12 @@ sudo ./ad-client-diagnostic.sh domain.controller.address 'DOMAIN\username'
 sudo ./ad-client-diagnostic.sh domain.controller.address
 ```
 
-### Что этот скрипт даст: состояние DNS, SRV-записей домена, Kerberos, keytab, SSSD, GPOA/gpupdate, SYSVOL-доступ, порты контроллеров, системные журналы, косвенные признаки проблем с Kaspersky и сетевой доступностью центра лицензирования. Это как раз то, что можно собрать с клиента без прав на сервер.
+### Что этот скрипт даст: 
+### - Состояние DNS, 
+### - SRV-записей домена, Kerberos, keytab, SSSD, GPOA/gpupdate, 
+### - SYSVOL-доступ, порты контроллеров, системные журналы, 
+### - Косвенные признаки проблем с Kaspersky и сетевой доступностью центра лицензирования. 
+### Это как раз то, что можно собрать с клиента без прав на сервер.
 
 ---
 
